@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>COOKING SHOW: ULTRA MAX</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500;700&display=swap');
+
+    :root {
+        --bg: #050505;
+        --panel: #14141a;
+        --neon-blue: #00f3ff;
+        --neon-pink: #ff0055;
+        --neon-green: #00ff66;
+        --neon-yellow: #ffcc00;
+        --glass: rgba(255, 255, 255, 0.05);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    
+    body {
+        margin: 0;
+        background-color: var(--bg);
+        color: white;
+        font-family: 'Roboto Mono', monospace;
+        overflow: hidden;
+        height: 100vh;
+        width: 100vw;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* CRT SCANLINE EFFECT OVERLAY */
+    body::after {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0; left: 0; bottom: 0; right: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+        z-index: 100;
+        background-size: 100% 2px, 3px 100%;
+        pointer-events: none;
+    }
+
+    #ui-layer {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 10px;
+    }
+
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-shadow: 0 0 10px var(--neon-blue);
+    }
+
+    h1 {
+        font-family: 'Black Ops One', cursive;
+        margin: 0;
+        font-size: 24px;
+        background: linear-gradient(to bottom, #fff, #aaa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .hud-pill {
+        background: var(--glass);
+        border: 1px solid rgba(255,255,255,0.1);
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    #game-canvas {
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+    }
+
+    /* CONTROLS UI */
+    #controls {
+        pointer-events: auto;
+        display: flex;
+        gap: 10px;
+        padding-bottom: 20px;
+        justify-content: center;
+    }
+
+    .action-btn {
+        background: var(--panel);
+        color: white;
+        border: 2px solid var(--neon-blue);
+        padding: 15px 20px;
+        border-radius: 12px;
+        font-family: 'Black Ops One', cursive;
+        font-size: 18px;
+        text-transform: uppercase;
+        box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        transition: transform 0.1s;
+        min-width: 100px;
+    }
+
+    .action-btn:active { transform: scale(0.95); background: var(--neon-blue); color: black; }
+    .action-btn.pink { border-color: var(--neon-pink); box-shadow: 0 0 15px rgba(255, 0, 85, 0.2); }
+    .action-btn.pink:active { background: var(--neon-pink); }
+
+    /* POPUPS */
+    .modal {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(10, 10, 15, 0.95);
+        border: 2px solid var(--neon-green);
+        padding: 30px;
+        border-radius: 15px;
+        text-align: center;
+        pointer-events: auto;
+        box-shadow: 0 0 50px rgba(0, 255, 102, 0.2);
+        z-index: 50;
+        display: none;
+        min-width: 300px;
+    }
+    
+    .modal h2 { font-family: 'Black Ops One'; font-size: 32px; color: var(--neon-green); margin: 0 0 10px 0; }
+    .modal p { color: #ccc; margin-bottom: 20px; line-height: 1.5; }
+    
+    #start-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 60; background: black; width: 100%; height: 100%; position: absolute; top:0; left:0; }
+    #start-btn { font-size: 24px; padding: 20px 40px; border-color: var(--neon-yellow); color: var(--neon-yellow); animation: pulse 1s infinite; }
+    
+    /* COOKING UI OVERLAY */
+    #cook-overlay {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 300px;
+        background: rgba(0,0,0,0.9);
+        border: 2px solid var(--neon-pink);
+        padding: 20px;
+        border-radius: 15px;
+        display: none;
+        pointer-events: auto;
+        z-index: 40;
+    }
+    input[type=range] { width: 100%; margin: 15px 0; accent-color: var(--neon-pink); }
+
+    /* ANIMATIONS */
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); box-shadow: 0 0 30px var(--neon-yellow); } 100% { transform: scale(1); } }
+    
+    /* FLOATERS */
+    .floater { position: absolute; font-weight: bold; pointer-events: none; animation: floatUp 1s forwards; font-size: 20px; text-shadow: 2px 2px 0 #000; }
+    @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-50px) scale(1.5); } }
+
+    #judging-lines { text-align: left; font-size: 14px; margin-bottom: 15px; font-family: monospace; }
+</style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <header>
+            <h1>COOKING SHOW</h1>
+            <div class="hud-pill" id="score-pill">SCORE: 0</div>
+            <div class="hud-pill" style="border-color: var(--neon-pink)">TIME: <span id="timer">00:00</span></div>
+        </header>
+        
+        <div id="round-info" style="text-align: center; margin-top: 10px;">
+            <div style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 2px;">Current Theme</div>
+            <div id="theme-text" style="font-size: 20px; font-weight: bold; color: var(--neon-yellow); text-shadow: 0 0 10px rgba(255,204,0,0.5);">LOADING...</div>
+        </div>
+
+        <div style="flex:1"></div> <div id="controls">
+            <button class="action-btn" id="btn-plate">PLATE IT</button>
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <h1 style="font-size: 50px; color: white; margin-bottom: 10px;">ULTRA MAX</h1>
+        <p style="color: #888; margin-bottom: 30px;">TURN UP YOUR VOLUME</p>
+        <button class="action-btn" id="start-btn">START SHOW</button>
+    </div>
+
+    <div id="modal-results" class="modal">
+        <h2>JUDGES SAY...</h2>
+        <div id="judging-lines"></div>
+        <div id="final-score" style="font-size: 40px; font-weight: bold; margin-bottom: 20px;">0/15</div>
+        <button class="action-btn pink" id="next-round-btn">NEXT ROUND</button>
+    </div>
+
+    <div id="cook-overlay">
+        <h3 style="color: var(--neon-pink); margin: 0; text-align: center;">HEAT CONTROL</h3>
+        <label>TEMPERATURE</label>
+        <input type="range" id="temp-slider" min="100" max="300" value="180">
+        <div style="display:flex; justify-content: space-between; font-size: 12px; color: #aaa;">
+            <span>LOW</span><span>MED</span><span>INFERNO</span>
+        </div>
+        <button class="action-btn pink" id="stop-cook-btn" style="width: 100%; margin-top: 20px;">STOP COOKING</button>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+<script>
+/**
+ * AUDIO ENGINE (Web Audio API)
+ * Procedural sound synthesis - no files required.
+ */
+const AudioEngine = {
+    ctx: null,
+    init: function() {
+        window.AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+    },
+    playTone: function(freq, type, duration, vol=0.1) {
+        if(!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    sfxPop: function() { this.playTone(600 + Math.random()*200, 'sine', 0.1); },
+    sfxThud: function() { this.playTone(100, 'square', 0.1, 0.2); },
+    sfxSizzle: function() { 
+        // White noise for sizzle
+        if(!this.ctx) return;
+        const bufferSize = this.ctx.sampleRate * 0.5;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for(let i=0; i<bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
+        noise.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start();
+    },
+    sfxWin: function() {
+        this.playTone(440, 'sine', 0.1, 0.1);
+        setTimeout(()=>this.playTone(554, 'sine', 0.1, 0.1), 100);
+        setTimeout(()=>this.playTone(659, 'sine', 0.4, 0.1), 200);
+    },
+    sfxFail: function() {
+        this.playTone(150, 'sawtooth', 0.4, 0.2);
+        setTimeout(()=>this.playTone(100, 'sawtooth', 0.4, 0.2), 200);
+    },
+    sfxAlert: function() {
+        this.playTone(800, 'square', 0.1, 0.05);
+        setTimeout(()=>this.playTone(800, 'square', 0.1, 0.05), 100);
+    }
+};
+
+/**
+ * GAME CONSTANTS & DATA
+ */
+const INGREDIENTS = [
+    { name: "Steak", icon: "🥩", color: "#d63e3e", type: "protein", sweet:0, salty:0.2, umami:0.9 },
+    { name: "Tomato", icon: "🍅", color: "#ff4d4d", type: "veg", sweet:0.3, salty:0, umami:0.4 },
+    { name: "Cheese", icon: "🧀", color: "#ffcc00", type: "dairy", sweet:0.1, salty:0.6, umami:0.7 },
+    { name: "Shrimp", icon: "🦐", color: "#ff9999", type: "protein", sweet:0.2, salty:0.3, umami:0.5 },
+    { name: "Greens", icon: "🥬", color: "#4dff4d", type: "veg", sweet:0.1, salty:0, umami:0.1 },
+    { name: "Chili", icon: "🌶️", color: "#ff0000", type: "spice", sweet:0, salty:0, umami:0.2, spice: 1.0 },
+    { name: "Lemon", icon: "🍋", color: "#ffff00", type: "acid", sweet:0, salty:0, sour: 1.0 },
+    { name: "Bread", icon: "🍞", color: "#d9a066", type: "carb", sweet:0.1, salty:0.1, umami:0.1 },
+    { name: "Egg", icon: "🥚", color: "#ffffff", type: "protein", sweet:0.1, salty:0.1, umami:0.4 },
+    { name: "Magic Truffle", icon: "💎", color: "#00ffff", type: "magic", sweet:0.5, salty:0.5, umami:1.0, isMagic: true }
+];
+
+const THEMES = [
+    { name: "MEAT LOVER", rule: "Protein heavy. High Umami.", check: (s)=> s.umami > 2 },
+    { name: "SPICY KICK", rule: "Needs Chili. Don't be bland.", check: (s)=> s.spice > 0.5 },
+    { name: "VEGGIE DELIGHT", rule: "Green & Healthy. No Meat.", check: (s)=> s.vegCount >= 2 && s.proteinCount === 0 },
+    { name: "SWEET & SALTY", rule: "Balance the opposing forces.", check: (s)=> Math.abs(s.sweet - s.salty) < 0.5 && s.sweet > 1 },
+    { name: "COLOR EXPLOSION", rule: "Use 5 different colors.", check: (s)=> s.colors >= 5 }
+];
+
+/**
+ * RENDERER & GAME LOOP
+ */
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+let width, height, dpr;
+
+// State
+let gameState = "start"; // start, play, cooking, judging
+let particles = [];
+let floaters = [];
+let items = []; // Ingredients on board
+let thief = { x: -100, y: 0, active: false, speed: 0, item: null };
+let bowl = [];
+let skillet = [];
+let currentTheme = null;
+let roundTime = 60;
+let lastTime = 0;
+let cameraShake = 0;
+let score = 0;
+let cookingStats = { temp: 180, progress: 0, burn: 0 }; // 0-100
+
+// Zones
+let zoneShelf, zoneFridge, zoneBowl, zoneSkillet;
+
+function resize() {
+    dpr = window.devicePixelRatio || 1;
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    
+    // Define Zones
+    const zoneH = height * 0.3;
+    zoneShelf = { x: 10, y: 60, w: width/2 - 20, h: zoneH, color: '#2a2a35', label: 'SHELF' };
+    zoneFridge = { x: width/2 + 10, y: 60, w: width/2 - 20, h: zoneH, color: '#2a3535', label: 'FRIDGE' };
+    
+    const lowerY = height * 0.5;
+    zoneBowl = { x: width * 0.1, y: lowerY, r: width * 0.18, color: '#333', label: 'BOWL' };
+    zoneSkillet = { x: width * 0.6, y: lowerY, r: width * 0.18, color: '#111', label: 'SKILLET' };
+}
+
+function initGame() {
+    score = 0;
+    startRound();
+}
+
+function startRound() {
+    gameState = "play";
+    roundTime = 90;
+    bowl = [];
+    skillet = [];
+    items = [];
+    particles = [];
+    currentTheme = THEMES[Math.floor(Math.random() * THEMES.length)];
+    document.getElementById('theme-text').innerText = `${currentTheme.name}`;
+    document.getElementById('timer').innerText = roundTime;
+    
+    // Spawn Ingredients
+    spawnIngredients();
+    
+    requestAnimationFrame(loop);
+}
+
+function spawnIngredients() {
+    // Fill shelf and fridge
+    for(let i=0; i<6; i++) {
+        const ing = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
+        items.push({
+            data: ing,
+            x: zoneShelf.x + 20 + Math.random() * (zoneShelf.w - 60),
+            y: zoneShelf.y + 40 + Math.random() * (zoneShelf.h - 80),
+            w: 50, h: 50,
+            vx: 0, vy: 0,
+            held: false,
+            scale: 1,
+            state: 'raw' // raw, cooked, burnt
+        });
+    }
+    for(let i=0; i<6; i++) {
+        const ing = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
+        items.push({
+            data: ing,
+            x: zoneFridge.x + 20 + Math.random() * (zoneFridge.w - 60),
+            y: zoneFridge.y + 40 + Math.random() * (zoneFridge.h - 80),
+            w: 50, h: 50,
+            vx: 0, vy: 0,
+            held: false,
+            scale: 1,
+            state: 'raw'
+        });
+    }
+}
+
+function loop(timestamp) {
+    const dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    update(dt);
+    draw();
+
+    if (gameState !== "start") requestAnimationFrame(loop);
+}
+
+function update(dt) {
+    // Timer
+    if(gameState === "play") {
+        roundTime -= dt;
+        if(roundTime <= 0) { roundTime = 0; plateDish(); }
+        document.getElementById('timer').innerText = Math.ceil(roundTime);
+        
+        // Thief Logic
+        if(!thief.active && Math.random() < 0.005) {
+            thief.active = true;
+            thief.x = -50;
+            thief.y = height * 0.4 + Math.random() * 100;
+            thief.speed = 200 + Math.random() * 100;
+            thief.item = null;
+            // Thief tries to steal from shelf
+            if(items.length > 0) {
+                const target = items[Math.floor(Math.random()*items.length)];
+                thief.targetItem = target;
+            }
+        }
+        
+        if(thief.active) {
+            thief.x += thief.speed * dt;
+            if(thief.item) {
+                thief.item.x = thief.x;
+                thief.item.y = thief.y + 20;
+            } else if (thief.targetItem && Math.abs(thief.x - thief.targetItem.x) < 20) {
+                // Steal!
+                thief.item = thief.targetItem;
+                thief.targetItem.held = true; // Lock it
+                AudioEngine.sfxFail();
+                addFloater("YOINK!", thief.x, thief.y, "#ff0055");
+            }
+            
+            if(thief.x > width) {
+                if(thief.item) {
+                    // Item gone forever
+                    items = items.filter(i => i !== thief.item);
+                }
+                thief.active = false;
+            }
+        }
+    }
+
+    // Cooking Physics
+    if(gameState === "cooking") {
+        const temp = parseInt(document.getElementById('temp-slider').value);
+        const heat = (temp - 100) / 200; // 0 to 1
+        
+        // Progress faster with heat
+        cookingStats.progress += (5 + (heat * 20)) * dt;
+        
+        // Burn if too hot or cooked too long
+        if(cookingStats.progress > 100 || temp > 250) {
+            cookingStats.burn += (heat * 15) * dt;
+        }
+
+        // Smoke particles
+        if(Math.random() < heat) {
+            createParticle(zoneSkillet.x + zoneSkillet.r/2, zoneSkillet.y, 
+                (Math.random()-0.5)*20, -50 - Math.random()*50, 
+                cookingStats.burn > 20 ? '#555' : '#fff', 2);
+        }
+
+        if(Math.random() < 0.05) AudioEngine.sfxSizzle();
+    }
+
+    // Physics for items
+    items.forEach(item => {
+        if (!item.held) {
+            // Friction
+            item.vx *= 0.9;
+            item.vy *= 0.9;
+            item.x += item.vx * dt;
+            item.y += item.vy * dt;
+            
+            // Bounds
+            if(item.x < 0) item.x = 0;
+            if(item.x > width-50) item.x = width-50;
+            if(item.y < 50) item.y = 50;
+            if(item.y > height-50) item.y = height-50;
+
+            // Scale return to 1
+            item.scale += (1 - item.scale) * 10 * dt;
+        } else {
+            item.scale = 1.2;
+        }
+    });
+
+    // Particles
+    particles.forEach((p, i) => {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        if(p.life <= 0) particles.splice(i, 1);
+    });
+
+    // Shake dampening
+    cameraShake *= 0.9;
+    if(cameraShake < 0.5) cameraShake = 0;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, width, height);
+    
+    // Camera Shake
+    ctx.save();
+    if(cameraShake > 0) {
+        ctx.translate((Math.random()-0.5)*cameraShake, (Math.random()-0.5)*cameraShake);
+    }
+
+    // Draw Zones
+    // Shelf
+    ctx.fillStyle = zoneShelf.color;
+    ctx.fillRect(zoneShelf.x, zoneShelf.y, zoneShelf.w, zoneShelf.h);
+    ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
+    ctx.strokeRect(zoneShelf.x, zoneShelf.y, zoneShelf.w, zoneShelf.h);
+    drawLabel(zoneShelf.label, zoneShelf.x + 10, zoneShelf.y + 20);
+
+    // Fridge
+    ctx.fillStyle = zoneFridge.color;
+    ctx.fillRect(zoneFridge.x, zoneFridge.y, zoneFridge.w, zoneFridge.h);
+    ctx.strokeRect(zoneFridge.x, zoneFridge.y, zoneFridge.w, zoneFridge.h);
+    drawLabel(zoneFridge.label, zoneFridge.x + 10, zoneFridge.y + 20);
+
+    // Bowl
+    ctx.beginPath();
+    ctx.arc(zoneBowl.x + zoneBowl.r/2, zoneBowl.y + zoneBowl.r/2, zoneBowl.r, 0, Math.PI*2);
+    ctx.fillStyle = zoneBowl.color;
+    ctx.fill();
+    ctx.strokeStyle = '#555'; ctx.stroke();
+    drawLabel(zoneBowl.label, zoneBowl.x, zoneBowl.y + zoneBowl.r + 20);
+
+    // Skillet
+    ctx.beginPath();
+    ctx.arc(zoneSkillet.x + zoneSkillet.r/2, zoneSkillet.y + zoneSkillet.r/2, zoneSkillet.r, 0, Math.PI*2);
+    ctx.fillStyle = gameState === "cooking" ? '#3a1111' : zoneSkillet.color;
+    ctx.fill();
+    // Skillet Glow if cooking
+    if(gameState === "cooking") {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ff4d4d';
+        ctx.strokeStyle = '#ff4d4d';
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        
+        // Progress Ring
+        ctx.beginPath();
+        ctx.arc(zoneSkillet.x + zoneSkillet.r/2, zoneSkillet.y + zoneSkillet.r/2, zoneSkillet.r + 10, -Math.PI/2, (-Math.PI/2) + (Math.PI*2 * (cookingStats.progress/100)));
+        ctx.strokeStyle = '#00ff66';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.lineWidth = 1;
+    } else {
+        ctx.strokeStyle = '#555'; ctx.stroke();
+    }
+    
+    // Draw Items
+    items.forEach(item => {
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.ellipse(item.x + item.w/2, item.y + item.h - 5, item.w/3 * item.scale, 5, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        // Icon
+        ctx.save();
+        ctx.translate(item.x + item.w/2, item.y + item.h/2);
+        ctx.scale(item.scale, item.scale);
+        
+        // State tint
+        if(item.state === 'burnt') ctx.filter = 'grayscale(100%) brightness(30%) sepia(100%) hue-rotate(0deg) saturate(500%)'; // Charred
+        else if(item.state === 'cooked') ctx.filter = 'sepia(30%) brightness(90%) contrast(120%)'; // Golden
+        
+        if(item.data.isMagic) {
+            ctx.shadowColor = 'cyan';
+            ctx.shadowBlur = 10 + Math.sin(Date.now()/200)*10;
+        }
+
+        ctx.font = "40px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(item.data.icon, 0, 0);
+        ctx.restore();
+    });
+
+    // Thief
+    if(thief.active) {
+        ctx.font = "50px Arial";
+        ctx.fillText("👺", thief.x, thief.y + 25);
+    }
+
+    // Particles
+    particles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    });
+
+    // Characters (Mama & Vinny)
+    drawCharacter(20, height - 100, "👩‍🍳", "MAMA");
+    drawCharacter(100, height - 80, "👦", "VINNY");
+
+    ctx.restore();
+}
+
+function drawLabel(text, x, y) {
+    ctx.fillStyle = '#888';
+    ctx.font = '12px monospace';
+    ctx.fillText(text, x, y);
+}
+
+function drawCharacter(x, y, icon, name) {
+    const bounce = Math.sin(Date.now() / 300) * 5;
+    ctx.font = "60px Arial";
+    ctx.fillText(icon, x, y + bounce);
+    ctx.font = "12px monospace";
+    ctx.fillStyle = "white";
+    ctx.fillText(name, x + 10, y + 20);
+}
+
+function createParticle(x, y, vx, vy, color, size) {
+    particles.push({ x, y, vx, vy, color, size, life: 1.0 });
+}
+
+function addFloater(text, x, y, color) {
+    const el = document.createElement('div');
+    el.className = 'floater';
+    el.innerText = text;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.color = color;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+}
+
+/**
+ * INTERACTION LOGIC
+ */
+let dragItem = null;
+let dragOffset = {x:0, y:0};
+
+canvas.addEventListener('pointerdown', e => {
+    if(gameState !== "play") return;
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+
+    // Hit test Thief
+    if(thief.active && Math.abs(x - thief.x) < 40 && Math.abs(y - thief.y) < 40) {
+        thief.active = false;
+        AudioEngine.sfxPop();
+        cameraShake = 10;
+        createParticle(thief.x, thief.y, 0, 0, '#fff', 50);
+        addFloater("BONK!", thief.x, thief.y, "#fff");
+        if(thief.item) thief.item.held = false; // Drop item
+        return;
+    }
+
+    // Hit test Items
+    for(let i=items.length-1; i>=0; i--) {
+        const item = items[i];
+        if(x > item.x && x < item.x + item.w && y > item.y && y < item.y + item.h) {
+            dragItem = item;
+            dragItem.held = true;
+            dragOffset.x = x - item.x;
+            dragOffset.y = y - item.y;
+            AudioEngine.sfxPop();
+            
+            // Remove from lists if picking up
+            bowl = bowl.filter(i => i !== item);
+            skillet = skillet.filter(i => i !== item);
+            break;
+        }
+    }
+    
+    // Hit test Skillet (to open menu)
+    const dSkillet = Math.hypot(x - (zoneSkillet.x + zoneSkillet.r/2), y - (zoneSkillet.y + zoneSkillet.r/2));
+    if(!dragItem && dSkillet < zoneSkillet.r && skillet.length > 0) {
+        openCookMenu();
+    }
+});
+
+window.addEventListener('pointermove', e => {
+    if(!dragItem) return;
+    const r = canvas.getBoundingClientRect();
+    dragItem.x = (e.clientX - r.left) - dragOffset.x;
+    dragItem.y = (e.clientY - r.top) - dragOffset.y;
+});
+
+window.addEventListener('pointerup', e => {
+    if(!dragItem) return;
+    const item = dragItem;
+    item.held = false;
+    dragItem = null;
+    AudioEngine.sfxThud();
+
+    // Check Zones
+    const cx = item.x + item.w/2;
+    const cy = item.y + item.h/2;
+    
+    // Drop in Bowl
+    const dBowl = Math.hypot(cx - (zoneBowl.x + zoneBowl.r/2), cy - (zoneBowl.y + zoneBowl.r/2));
+    if(dBowl < zoneBowl.r) {
+        bowl.push(item);
+        // Snap to center with randomness
+        item.x = zoneBowl.x + zoneBowl.r/2 - 25 + (Math.random()-0.5)*40;
+        item.y = zoneBowl.y + zoneBowl.r/2 - 25 + (Math.random()-0.5)*40;
+        createParticle(cx, cy, 0, -50, '#fff', 5);
+    }
+    
+    // Drop in Skillet
+    const dSkillet = Math.hypot(cx - (zoneSkillet.x + zoneSkillet.r/2), cy - (zoneSkillet.y + zoneSkillet.r/2));
+    if(dSkillet < zoneSkillet.r) {
+        skillet.push(item);
+        item.x = zoneSkillet.x + zoneSkillet.r/2 - 25 + (Math.random()-0.5)*40;
+        item.y = zoneSkillet.y + zoneSkillet.r/2 - 25 + (Math.random()-0.5)*40;
+    }
+});
+
+/**
+ * GAMEPLAY FUNCTIONS
+ */
+function openCookMenu() {
+    gameState = "cooking";
+    cookingStats = { temp: 180, progress: 0, burn: 0 };
+    document.getElementById('cook-overlay').style.display = "block";
+    document.getElementById('ui-layer').style.pointerEvents = "none";
+}
+
+document.getElementById('stop-cook-btn').onclick = () => {
+    gameState = "play";
+    document.getElementById('cook-overlay').style.display = "none";
+    document.getElementById('ui-layer').style.pointerEvents = "none";
+    
+    // Apply Cooking Results to Items
+    let result = 'cooked';
+    if(cookingStats.progress < 50) result = 'raw';
+    if(cookingStats.burn > 50) result = 'burnt';
+
+    skillet.forEach(item => {
+        item.state = result;
+        createParticle(item.x, item.y, 0, -100, '#fff', 10);
+    });
+    
+    if(result === 'cooked') {
+        AudioEngine.sfxWin();
+        addFloater("PERFECT!", width/2, height/2, "#0f0");
+    } else if (result === 'burnt') {
+        AudioEngine.sfxFail();
+        addFloater("BURNT!", width/2, height/2, "#f00");
+    }
+};
+
+document.getElementById('btn-plate').onclick = plateDish;
+
+function plateDish() {
+    if(gameState !== "play") return;
+    gameState = "judging";
+    
+    // Combine Bowl + Skillet
+    const finalDish = [...bowl, ...skillet];
+    
+    // Calculate Stats
+    let stats = { sweet:0, salty:0, sour:0, umami:0, spice:0, colors:0, vegCount:0, proteinCount:0 };
+    let colorSet = new Set();
+    
+    finalDish.forEach(i => {
+        const d = i.data;
+        stats.sweet += d.sweet || 0;
+        stats.salty += d.salty || 0;
+        stats.sour += d.sour || 0;
+        stats.umami += d.umami || 0;
+        stats.spice += d.spice || 0;
+        colorSet.add(d.color);
+        if(d.type === 'veg') stats.vegCount++;
+        if(d.type === 'protein') stats.proteinCount++;
+    });
+    stats.colors = colorSet.size;
+
+    // JUDGING LOGIC
+    let log = "";
+    let finalScore = 0;
+    
+    // 1. Theme Check
+    if(currentTheme.check(stats)) {
+        log += `THEME MATCH: ${currentTheme.name} (+5)\n`;
+        finalScore += 5;
+    } else {
+        log += `THEME MISS: Needed ${currentTheme.rule} (-2)\n`;
+        finalScore -= 2;
+    }
+
+    // 2. Cook Quality
+    let burnedItems = finalDish.filter(i => i.state === 'burnt').length;
+    let rawItems = finalDish.filter(i => i.state === 'raw' && i.data.type === 'protein').length;
+    
+    if(burnedItems > 0) { log += `BURNT FOOD: -${burnedItems*2}\n`; finalScore -= burnedItems*2; }
+    if(rawItems > 0) { log += `RAW MEAT (DANGEROUS): -5\n`; finalScore -= 5; }
+    if(burnedItems === 0 && rawItems === 0 && finalDish.length > 3) {
+        log += `COOKING PERFECTION (+5)\n`;
+        finalScore += 5;
+    }
+
+    // 3. Variety
+    if(finalDish.length < 3) {
+        log += `TINY PORTION (-3)\n`;
+        finalScore -= 3;
+    } else {
+        log += `GOOD PORTION (+3)\n`;
+        finalScore += 3;
+    }
+    
+    // 4. Flavor Balance
+    if(stats.umami > 2) { log += `UMAMI BOMB (+2)\n`; finalScore += 2; }
+    
+    // Cap Score
+    if(finalScore < 0) finalScore = 0;
+    if(finalScore > 15) finalScore = 15;
+
+    // SHOW RESULTS
+    document.getElementById('judging-lines').innerText = log;
+    document.getElementById('final-score').innerText = `${finalScore}/15`;
+    document.getElementById('modal-results').style.display = "block";
+    
+    if(finalScore >= 10) AudioEngine.sfxWin();
+    else AudioEngine.sfxFail();
+}
+
+document.getElementById('next-round-btn').onclick = () => {
+    document.getElementById('modal-results').style.display = "none";
+    startRound();
+};
+
+document.getElementById('start-btn').onclick = () => {
+    AudioEngine.init(); // Must be user triggered
+    AudioEngine.sfxWin();
+    document.getElementById('start-screen').style.display = "none";
+    resize();
+    initGame();
+};
+
+</script>
+</body>
+</html>
