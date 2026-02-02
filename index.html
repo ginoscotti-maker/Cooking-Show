@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Cooking Show — Season (Single File)</title>
+<style>
+:root{--ink:#eaf0ff;--muted:#9fb0d9}
+html,body{margin:0;height:100%;background:linear-gradient(180deg,#070a12,#0b0f1a 40%,#060812);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+#wrap{display:flex;flex-direction:column;height:100%}
+#topbar{padding:10px 12px;background:rgba(18,26,43,.92);border-bottom:1px solid rgba(255,255,255,.08)}
+#title{font-weight:950;letter-spacing:.3px}
+#subtitle{color:var(--muted);font-size:12px;margin-top:2px;line-height:1.2}
+#hud{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.pill{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:12px}
+.pill strong{font-weight:950}
+.btn{appearance:none;border:0;border-radius:12px;padding:10px 12px;background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.06));color:var(--ink);font-weight:950;letter-spacing:.2px}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.45}
+#main{flex:1;display:grid;grid-template-columns:1.2fr .8fr;gap:10px;padding:10px}
+#stage{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden}
+#side{display:flex;flex-direction:column;gap:10px}
+.panel{background:rgba(18,26,43,.92);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:10px}
+.panel h3{margin:0 0 8px 0;font-size:14px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0}
+.row label{font-size:12px;color:var(--muted)}
+input[type="range"]{width:100%}
+#canvas{width:100%;height:100%;display:block}
+#overlayZap{position:absolute;inset:0;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px);background:rgba(0,0,0,.25)}
+#zapText{font-size:42px;font-weight:1000;letter-spacing:2px;padding:14px 20px;border-radius:18px;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);box-shadow:0 12px 40px rgba(0,0,0,.45)}
+#judgePanel{display:none}
+#judgePanel pre{white-space:pre-wrap;margin:8px 0 0 0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:12px;color:#dbe6ff;background:rgba(255,255,255,.04);padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.08)}
+#hint{font-size:12px;color:var(--muted);line-height:1.25}
+.legend{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#dce6ff}
+#footerHint{padding:10px 12px;color:var(--muted);font-size:12px;border-top:1px solid rgba(255,255,255,.08);background:rgba(18,26,43,.92)}
+@media (max-width:900px){#main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <div id="title">Cooking Show — Season (Single File)</div>
+    <div id="subtitle">12 rounds • zodiac random order • no repeats • drag to Bowl → tap Skillet to cook → PLATE • random freeze-frame: “COOKING SHOW”</div>
+    <div id="hud">
+      <div class="pill"><strong>Season:</strong> <span id="seasonProg">0/12</span></div>
+      <div class="pill"><strong>Wins:</strong> <span id="wins">0</span></div>
+      <div class="pill"><strong>Round:</strong> <span id="roundName">—</span></div>
+      <div class="pill"><strong>Objective:</strong> <span id="roundRule">—</span></div>
+      <div class="pill"><strong>Time:</strong> <span id="timeLeft">180.0</span>s</div>
+      <button class="btn" id="btnStartSeason">Start Season</button>
+      <button class="btn" id="btnNext" disabled>Next Round</button>
+      <button class="btn" id="btnPlate">PLATE!</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="overlayZap"><div id="zapText">COOKING SHOW</div></div>
+    </div>
+
+    <div id="side">
+      <div class="panel">
+        <h3>Cook Controls (tap Skillet)</h3>
+        <div id="cookUI" style="display:none">
+          <div class="row"><label>Temperature</label><div><span id="tempVal">170</span>°</div></div>
+          <input type="range" min="100" max="260" value="170" id="temp"/>
+          <div class="row"><label>Time (cook seconds)</label><div><span id="cookTimeVal">8.0</span>s</div></div>
+          <input type="range" min="2" max="20" step="0.5" value="8" id="cookTime"/>
+          <div class="row">
+            <button class="btn" id="btnStartCook">Start Cooking</button>
+            <button class="btn" id="btnCloseCook">Close</button>
+          </div>
+          <div id="hint">Cooking is accelerated. High heat + long time = burn city. Low heat + short time = raw sadness.</div>
+        </div>
+        <div id="cookClosedHint" class="legend">
+          <span class="chip">Drag → Bowl</span><span class="chip">Tap Skillet → Cook</span><span class="chip">Plate anytime</span>
+        </div>
+      </div>
+
+      <div class="panel" id="judgePanel">
+        <h3>Judges</h3>
+        <pre id="judgeText"></pre>
+        <div class="legend">
+          <span class="chip">1 = Soo Basic</span>
+          <span class="chip">5 = Nom-Noms</span>
+          <span class="chip">Pass ≥ 10</span>
+          <span class="chip">14–15 → Magic next</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Rules</h3>
+        <div id="hint">
+          • Each round: <b>8–12</b> ingredients split between <b>Shelf</b> and <b>Fridge</b>.<br/>
+          • Judge: <b>Colorful</b> + <b>Unique</b> + <b>Tasty</b> (1–5 each).<br/>
+          • Pass = <b>10+</b>. Fail ends season (for now).<br/>
+          • Score <b>14–15</b> → unlock a <b>Magic Ingredient</b> next round.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footerHint">Next upgrade: Oven + Pot + Blender zones with distinct cooking physics + more “pro kitchen” chaos.</div>
+</div>
+
+<script>
+const LABEL={1:"Soo Basic",2:"Meh-Meh",3:"Pretty Good",4:"Yum!",5:"Nom-Noms"};
+const ZodiacRounds=[
+ {sign:"Aries",title:"Muy Caliente",rule:"Bring the heat! Spice wins hearts.",wants:{sweet:.1,salty:.4,sour:.2,umami:.5,spice:.9}},
+ {sign:"Taurus",title:"Comfort Feast",rule:"Cozy + rich. Make it comforting.",wants:{sweet:.3,salty:.5,sour:.1,umami:.7,spice:.2}},
+ {sign:"Gemini",title:"Salty & Sweet",rule:"You need BOTH salty and sweet.",wants:{sweet:.7,salty:.7,sour:.2,umami:.3,spice:.2}},
+ {sign:"Cancer",title:"Cozy & Soft",rule:"Soft textures. Gentle flavors.",wants:{sweet:.3,salty:.4,sour:.2,umami:.5,spice:.2}},
+ {sign:"Leo",title:"Showstopper",rule:"Flashy plating. Big color energy.",wants:{sweet:.4,salty:.4,sour:.3,umami:.4,spice:.3}},
+ {sign:"Virgo",title:"Clean & Precise",rule:"Fewer ingredients, better technique.",wants:{sweet:.3,salty:.4,sour:.3,umami:.5,spice:.2}},
+ {sign:"Libra",title:"Perfect Balance",rule:"Balanced flavors. No extremes.",wants:{sweet:.5,salty:.5,sour:.5,umami:.5,spice:.4}},
+ {sign:"Scorpio",title:"Dark & Bold",rule:"Deep flavor. Umami + spice welcome.",wants:{sweet:.2,salty:.6,sour:.2,umami:.9,spice:.6}},
+ {sign:"Sagittarius",title:"Wanderlust Fusion",rule:"Try an unusual combo. Be brave.",wants:{sweet:.4,salty:.5,sour:.4,umami:.6,spice:.5}},
+ {sign:"Capricorn",title:"Classic Technique",rule:"Cook it properly. No raw, no burn.",wants:{sweet:.3,salty:.5,sour:.2,umami:.7,spice:.3}},
+ {sign:"Aquarius",title:"Mad Science",rule:"Weird method. Weird but tasty.",wants:{sweet:.4,salty:.4,sour:.4,umami:.6,spice:.4}},
+ {sign:"Pisces",title:"Dreamy Pastels",rule:"Pretty colors + gentle harmony.",wants:{sweet:.6,salty:.3,sour:.3,umami:.4,spice:.2}},
+];
+function F(sweet,salty,sour,bitter,umami,spice){return{sweet,salty,sour,bitter,umami,spice}}
+function C(water,fat,sugar,starch){return{water,fat,sugar,starch}}
+function P(optimalTemp,burnSensitivity,drynessRate){return{optimalTemp,burnSensitivity,drynessRate}}
+function I(name,color,vibrance,flavor,chem,pref){return{kind:"normal",name,color,vibrance,flavor,chem,pref,uniqW:1}}
+function M(name,color,vibrance,effects){return{kind:"magic",name,color,vibrance,flavor:F(.1,.1,.1,.05,.1,.1),chem:C(.3,.1,.2,.1),pref:P(160,1.1,.9),uniqW:1.4,effects}}
+const Pantry=[
+ I("Tomato","#ff3b3b",.95,F(.2,.2,.4,.05,.3,.1),C(.9,.05,.15,.1),P(170,1,1)),
+ I("Spinach","#2dff6f",.9,F(.05,.15,.1,.1,.25,.05),C(.9,.05,.05,.2),P(150,1.1,1)),
+ I("Corn","#ffd84d",.9,F(.35,.1,.05,.02,.15,.02),C(.7,.05,.25,.6),P(170,1.1,1.1)),
+ I("Blueberry","#3b5bff",.9,F(.55,.02,.15,.05,.05,0),C(.85,.02,.25,.15),P(150,1,1)),
+ I("Chicken","#ffd9b3",.7,F(0,.25,.02,.02,.65,.05),C(.55,.15,.02,0),P(180,1.2,1.3)),
+ I("Beef","#a83232",.7,F(0,.3,.02,.05,.8,.05),C(.55,.25,.02,0),P(190,1.3,1.4)),
+ I("Cheese","#fff2a8",.85,F(.05,.45,.02,0,.6,0),C(.4,.7,.05,.1),P(170,1.3,1.2)),
+ I("Soy Sauce","#3b2a1f",.45,F(0,.9,.02,.02,.95,0),C(.95,.05,0,0),P(140,1.1,.9)),
+ I("Lemon","#fffb7a",.95,F(.2,0,.9,.05,.05,0),C(.9,0,.1,.05),P(120,1,.9)),
+ I("Chili","#ff2a6d",.9,F(0,.05,0,.1,.05,.95),C(.6,.05,.05,.1),P(190,1.4,1.2)),
+ I("Garlic","#fff0cc",.75,F(.02,.1,0,.05,.45,.1),C(.55,.05,.02,.15),P(180,1.3,1.1)),
+ I("Mushroom","#c8b08a",.6,F(.02,.15,0,.08,.75,.02),C(.85,.03,.02,.02),P(170,1.2,1.2)),
+ I("Rice","#f7f1e5",.55,F(.05,.02,0,0,.05,0),C(.6,.01,.02,.95),P(120,1,.8)),
+ I("Chocolate","#3a2418",.55,F(.9,.02,0,.15,0,0),C(.2,.35,.85,.1),P(150,1.5,1.1)),
+ I("Strawberry","#ff5ba6",.95,F(.55,.02,.25,.02,.02,0),C(.9,.02,.25,.1),P(150,1,1)),
+ I("Carrot","#ff8a2a",.9,F(.25,.02,0,.02,.02,0),C(.9,.02,.18,.15),P(170,1.1,1)),
+ I("Egg","#fff7d1",.75,F(.02,.12,0,0,.45,0),C(.72,.25,.02,.02),P(160,1.2,1.1)),
+ I("Honey","#ffca4d",.9,F(.95,0,0,0,0,0),C(.1,0,.95,0),P(140,1.6,.8)),
+];
+const Magic=[
+ M("Fairy Dreams","#b7fffb",.95,{unique:+.12,color:+.10,tasty:+.03}),
+ M("Crunchy Snacks","#ffe066",.90,{tasty:+.10,unique:+.05}),
+ M("Star Dust","#ffffff",.98,{color:+.20,unique:+.08,tasty:-.03}),
+ M("The Color Blue","#2b6bff",.95,{color:+.25,tasty:-.05}),
+ M("Dragon Pepper","#ff1e5a",.92,{tasty:+.06,unique:+.08,spice:+.20}),
+];
+function newDish(){return{ingredients:[],internalTemp:0,cookLevel:0,moisture:1,browning:0,burn:0}}
+function randInt(a,b){return Math.floor(a+Math.random()*(b-a+1))}
+function randFloat(a,b){return a+Math.random()*(b-a)}
+function clamp01(x){return Math.max(0,Math.min(1,x))}
+function above(v,t){return v>=t?1:0}
+function toStars(v){return v<.2?1:v<.4?2:v<.6?3:v<.8?4:5}
+
+let state={
+ season:{deck:[],idx:0,wins:0,active:false},
+ round:null,timeLeft:180,running:false,
+ zapTimes:[],zapIndex:0,history:new Set(),grantedMagic:null,
+ bowlDish:newDish(),skilletDish:null,
+ skillet:{active:false,temp:170,remaining:0},
+ plated:null
+};
+
+const ui={
+ seasonProg:document.getElementById("seasonProg"),
+ wins:document.getElementById("wins"),
+ roundName:document.getElementById("roundName"),
+ roundRule:document.getElementById("roundRule"),
+ timeLeft:document.getElementById("timeLeft"),
+ btnStartSeason:document.getElementById("btnStartSeason"),
+ btnNext:document.getElementById("btnNext"),
+ btnPlate:document.getElementById("btnPlate"),
+ judgePanel:document.getElementById("judgePanel"),
+ judgeText:document.getElementById("judgeText"),
+ overlayZap:document.getElementById("overlayZap"),
+ cookUI:document.getElementById("cookUI"),
+ cookClosedHint:document.getElementById("cookClosedHint"),
+ temp:document.getElementById("temp"),
+ cookTime:document.getElementById("cookTime"),
+ tempVal:document.getElementById("tempVal"),
+ cookTimeVal:document.getElementById("cookTimeVal"),
+ btnStartCook:document.getElementById("btnStartCook"),
+ btnCloseCook:document.getElementById("btnCloseCook"),
+};
+ui.temp.addEventListener("input",()=>ui.tempVal.textContent=(+ui.temp.value).toFixed(0));
+ui.cookTime.addEventListener("input",()=>ui.cookTimeVal.textContent=(+ui.cookTime.value).toFixed(1));
+ui.btnStartSeason.onclick=()=>startSeason();
+ui.btnNext.onclick=()=>nextRound();
+ui.btnPlate.onclick=()=>plateNow();
+ui.btnCloseCook.onclick=()=>closeCookUI();
+ui.btnStartCook.onclick=()=>{
+ if(!state.bowlDish.ingredients.length)return;
+ state.skilletDish=state.bowlDish; state.bowlDish=newDish();
+ state.skillet.active=true; state.skillet.temp=+ui.temp.value; state.skillet.remaining=+ui.cookTime.value;
+ closeCookUI();
+};
+function openCookUI(){ui.cookUI.style.display="block";ui.cookClosedHint.style.display="none"}
+function closeCookUI(){ui.cookUI.style.display="none";ui.cookClosedHint.style.display="flex"}
+function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function updateSeasonHud(){ui.seasonProg.textContent=`${state.season.idx}/${state.season.deck.length}`;ui.wins.textContent=`${state.season.wins}`}
+
+function startSeason(){
+ state.season.deck=shuffle(ZodiacRounds);state.season.idx=0;state.season.wins=0;state.season.active=true;
+ state.history=new Set();state.grantedMagic=null;
+ ui.btnStartSeason.textContent="Restart Season";ui.btnNext.disabled=true;ui.judgePanel.style.display="none";
+ nextRound();
+}
+function nextRound(){
+ if(!state.season.active||state.season.idx>=state.season.deck.length)return;
+ ui.btnNext.disabled=true;ui.judgePanel.style.display="none";
+ state.plated=null;state.bowlDish=newDish();state.skilletDish=null;state.skillet.active=false;state.skillet.remaining=0;
+ state.timeLeft=180;state.running=true;state.zapIndex=0;
+ state.round=state.season.deck[state.season.idx];
+ ui.roundName.textContent=`#${state.season.idx+1} — ${state.round.sign} / ${state.round.title}`;
+ ui.roundRule.textContent=state.round.rule;
+ updateSeasonHud();ui.timeLeft.textContent=state.timeLeft.toFixed(1);
+ const zaps=randInt(1,3);state.zapTimes=[];for(let i=0;i<zaps;i++)state.zapTimes.push(randFloat(18,160));state.zapTimes.sort((a,b)=>a-b);
+ const count=randInt(8,12);const picks=new Set();const tiles=[];
+ if(state.grantedMagic){tiles.push(makeTile(state.grantedMagic,"shelf"));state.grantedMagic=null}
+ while(tiles.length<count){
+  const ing=Pantry[Math.floor(Math.random()*Pantry.length)];
+  if(picks.has(ing.name))continue;picks.add(ing.name);
+  tiles.push(makeTile(ing,Math.random()<.55?"shelf":"fridge"));
+ }
+ world.tiles=tiles;
+}
+function plateNow(){
+ if(!state.running&&state.plated)return;
+ const dish=state.skilletDish?state.skilletDish:state.bowlDish;
+ state.plated=(dish&&dish.ingredients.length)?dish:newDish();
+ endRound();
+}
+function endRound(){
+ state.running=false;closeCookUI();
+ const res=judge(state.plated,state.round,state.history);
+ const total=res.colorful+res.unique+res.tasty;
+ const passed=total>=10;
+ let text=`Colorful: ${LABEL[res.colorful]} (${res.colorful})\nUnique:   ${LABEL[res.unique]} (${res.unique})\nTasty:    ${LABEL[res.tasty]} (${res.tasty})\n\nTOTAL: ${total}/15\n`;
+ if(passed){text+="✅ ROUND PASS!";state.season.wins+=1}else{text+="❌ ROUND FAIL! (Season ends)";state.season.active=false}
+ if(passed&&total>=14){
+  const mg=Magic[Math.floor(Math.random()*Magic.length)];
+  state.grantedMagic=mg;text+=`\n\n🎁 Magic Ingredient Next Round: ${mg.name}`;
+ }
+ if(passed){
+  state.season.idx+=1;updateSeasonHud();
+  if(state.season.idx>=state.season.deck.length){text+=`\n\n🏁 SEASON COMPLETE! Final Wins: ${state.season.wins}/12`;ui.btnNext.disabled=true}
+  else{text+=`\n\nNext up: Round #${state.season.idx+1} — ${state.season.deck[state.season.idx].sign}`;ui.btnNext.disabled=false}
+ } else {updateSeasonHud();ui.btnNext.disabled=true;text+=`\n\nTap “Restart Season” to try again.`}
+ ui.judgeText.textContent=text;ui.judgePanel.style.display="block";
+}
+function judge(dish,round,history){
+ if(!dish||!dish.ingredients.length)return{colorful:1,unique:1,tasty:1};
+ const signature=dish.ingredients.map(x=>x.name).slice().sort().join("+");
+ const seen=history.has(signature);history.add(signature);
+
+ const fam=new Set();let vib=0;
+ for(const ing of dish.ingredients){vib+=ing.vibrance;fam.add(colorFamily(ing.color))}
+ vib/=dish.ingredients.length;
+ const burnPenalty=clamp01(dish.burn*.9+Math.max(0,dish.browning-1)*.4);
+ let color01=clamp01((fam.size-1)/5)*(0.55+vib*0.45);
+ color01*=(1-burnPenalty*.65);
+
+ let w=0;for(const ing of dish.ingredients)w+=(ing.uniqW||1);w/=dish.ingredients.length;
+ const sizeFactor=clamp01((dish.ingredients.length-2)/6);
+ let uniq01=0.45+0.35*sizeFactor+0.20*clamp01((w-0.8)/0.8);
+ if(seen)uniq01*=0.72;uniq01=clamp01(uniq01);
+
+ let agg={sweet:0,salty:0,sour:0,bitter:0,umami:0,spice:0};
+ for(const ing of dish.ingredients)for(const k in agg)agg[k]+=ing.flavor[k]||0;
+ for(const k in agg)agg[k]/=dish.ingredients.length;
+ const variety=(above(agg.sweet,.25)+above(agg.salty,.25)+above(agg.sour,.25)+above(agg.umami,.25)+above(agg.spice,.25))/5;
+ const bitternessPenalty=clamp01((agg.bitter-0.35)/0.45);
+ const rawPenalty=clamp01((0.55-dish.cookLevel)/0.55);
+ const overPenalty=clamp01((dish.cookLevel-1.15)/0.9);
+ const dryPenalty=clamp01((0.45-dish.moisture)/0.45);
+ const burnP=clamp01(dish.burn);
+ let theme=0;
+ theme+=1-Math.abs(agg.sweet-round.wants.sweet);
+ theme+=1-Math.abs(agg.salty-round.wants.salty);
+ theme+=1-Math.abs(agg.sour-round.wants.sour);
+ theme+=1-Math.abs(agg.umami-round.wants.umami);
+ theme+=1-Math.abs(agg.spice-round.wants.spice);
+ theme/=5;
+ let tasty01=0.40*variety+0.35*theme+0.25*1;
+ tasty01*=(1-0.55*rawPenalty)*(1-0.35*overPenalty);
+ tasty01*=(1-0.40*dryPenalty)*(1-0.70*burnP);
+ tasty01*=(1-0.35*bitternessPenalty);
+ tasty01=clamp01(tasty01);
+
+ const magic=dish.ingredients.find(x=>x.kind==="magic");
+ if(magic){
+  const e=magic.effects||{};
+  color01=clamp01(color01+(e.color||0));
+  uniq01=clamp01(uniq01+(e.unique||0));
+  tasty01=clamp01(tasty01+(e.tasty||0));
+ }
+ return{colorful:toStars(color01),unique:toStars(uniq01),tasty:toStars(tasty01)};
+}
+
+// Canvas + Interaction
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+let W=0,H=0,dpr=1;
+function resize(){dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));const rect=canvas.getBoundingClientRect();
+ W=Math.floor(rect.width*dpr);H=Math.floor(rect.height*dpr);canvas.width=W;canvas.height=H}
+window.addEventListener("resize",resize);resize();
+
+const world={tiles:[],dragging:null,dragOff:{x:0,y:0}};
+function makeTile(ing,origin){
+ const isShelf=origin==="shelf";
+ const x=(isShelf?0.08:0.62)+Math.random()*0.30;
+ const y=0.10+Math.random()*0.30;
+ return{ing,x:x*W,y:y*H,w:118*dpr,h:56*dpr,origin};
+}
+function zoneRects(){
+ return{
+  shelf:{x:0.05*W,y:0.06*H,w:0.42*W,h:0.38*H,label:"SHELF",sub:"Dry goods / pantry",icon:"📦"},
+  fridge:{x:0.53*W,y:0.06*H,w:0.42*W,h:0.38*H,label:"FRIDGE",sub:"Cold stuff",icon:"❄️"},
+  bowl:{x:0.10*W,y:0.52*H,w:0.32*W,h:0.36*H,label:"BOWL",sub:"Mix",icon:"🥣"},
+  skillet:{x:0.45*W,y:0.56*H,w:0.20*W,h:0.28*H,label:"SKILLET",sub:"Tap to cook",icon:"🍳"},
+  plate:{x:0.70*W,y:0.54*H,w:0.24*W,h:0.30*H,label:"PLATE",sub:"Final dish",icon:"🍽️"},
+ }}
+function inside(px,py,r){return px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h}
+function getP(e){const rect=canvas.getBoundingClientRect();return{x:(e.clientX-rect.left)*dpr,y:(e.clientY-rect.top)*dpr}}
+canvas.addEventListener("pointerdown",(e)=>{
+ const p=getP(e),z=zoneRects();
+ if(inside(p.x,p.y,z.skillet)){if(state.bowlDish.ingredients.length)openCookUI();return}
+ for(let i=world.tiles.length-1;i>=0;i--){
+  const t=world.tiles[i];
+  if(p.x>=t.x&&p.x<=t.x+t.w&&p.y>=t.y&&p.y<=t.y+t.h){
+   world.dragging=t;world.dragOff.x=p.x-t.x;world.dragOff.y=p.y-t.y;
+   world.tiles.splice(i,1);world.tiles.push(t);break;
+  }
+ }
+});
+canvas.addEventListener("pointermove",(e)=>{
+ if(!world.dragging)return;const p=getP(e);
+ world.dragging.x=p.x-world.dragOff.x;world.dragging.y=p.y-world.dragOff.y;
+});
+canvas.addEventListener("pointerup",(e)=>{
+ if(!world.dragging)return;const p=getP(e),t=world.dragging;world.dragging=null;
+ const z=zoneRects();
+ if(inside(p.x,p.y,z.bowl)){state.bowlDish.ingredients.push(t.ing);world.tiles=world.tiles.filter(x=>x!==t)}
+});
+
+// Cooking sim (accelerated)
+function lerp(a,b,t){return a+(b-a)*t}
+function simulateCooking(dt){
+ if(!state.skillet.active||!state.skilletDish)return;
+ const dish=state.skilletDish,cookerTemp=state.skillet.temp,simDt=dt*10.0;
+ let avgSugar=0,avgFat=0,avgWater=0,avgBurnSens=1,avgDry=1,optimal=170;
+ const n=dish.ingredients.length||1;
+ for(const ing of dish.ingredients){
+  avgSugar+=ing.chem.sugar;avgFat+=ing.chem.fat;avgWater+=ing.chem.water;
+  avgBurnSens+=ing.pref.burnSensitivity;avgDry+=ing.pref.drynessRate;optimal+=ing.pref.optimalTemp;
+ }
+ avgSugar/=n;avgFat/=n;avgWater/=n;avgBurnSens/=n;avgDry/=n;optimal/=n;
+ dish.internalTemp=lerp(dish.internalTemp,cookerTemp,0.08);
+ const tempFactor=clamp01((dish.internalTemp-70)/170);
+ const optimalFactor=1-clamp01(Math.abs(cookerTemp-optimal)/140);
+ dish.cookLevel+=simDt*0.35*(0.4+tempFactor)*(0.6+optimalFactor);
+ const browningChem=clamp01(0.2+avgSugar*0.8+avgFat*0.6);
+ const browningHeat=clamp01((cookerTemp-120)/140);
+ dish.browning+=simDt*0.25*browningChem*browningHeat;
+ const dryness=0.18*avgDry*(0.6+browningHeat)*(1.1-avgWater*0.7);
+ dish.moisture=clamp01(dish.moisture-simDt*dryness);
+ const burnHeatFactor=clamp01((cookerTemp-(optimal+30))/80);
+ if(dish.browning>1.0||burnHeatFactor>0.1){
+  dish.burn=clamp01(dish.burn+simDt*0.45*avgBurnSens*(0.3+burnHeatFactor));
+ }
+ state.skillet.remaining-=dt;
+ if(state.skillet.remaining<=0){state.skillet.remaining=0;state.skillet.active=false}
+}
+
+// Zap moments
+let zapActive=false,zapTimer=0;
+function triggerZap(){zapActive=true;zapTimer=0.35;ui.overlayZap.style.display="flex"}
+function updateZap(dt){if(!zapActive)return;zapTimer-=dt;if(zapTimer<=0){zapActive=false;ui.overlayZap.style.display="none"}}
+
+// Main loop
+let last=performance.now();
+function tick(now){
+ const dt=Math.min(0.05,(now-last)/1000);last=now;
+ if(zapActive){updateZap(dt);draw();requestAnimationFrame(tick);return}
+ if(state.running){
+  state.timeLeft-=dt;if(state.timeLeft<0)state.timeLeft=0;
+  ui.timeLeft.textContent=state.timeLeft.toFixed(1);
+  const tElapsed=180-state.timeLeft;
+  if(state.zapIndex<state.zapTimes.length&&tElapsed>=state.zapTimes[state.zapIndex]){state.zapIndex++;triggerZap()}
+  simulateCooking(dt);
+  if(state.timeLeft<=0)plateNow();
+ }
+ draw();requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// Drawing
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function drawText(txt,x,y,size,color,weight=800){ctx.fillStyle=color;ctx.font=`${weight} ${Math.floor(size*dpr)}px system-ui,-apple-system,Segoe UI,Roboto,Arial`;ctx.fillText(txt,x,y)}
+function drawZone(r){
+ ctx.save();
+ ctx.fillStyle="rgba(255,255,255,.04)";ctx.strokeStyle="rgba(255,255,255,.10)";
+ roundRect(r.x,r.y,r.w,r.h,18*dpr);ctx.fill();ctx.stroke();
+ drawText(`${r.icon} ${r.label}`,r.x+12*dpr,r.y+28*dpr,14,"rgba(234,240,255,.95)",950);
+ drawText(r.sub,r.x+12*dpr,r.y+48*dpr,11,"rgba(159,176,217,.9)",650);
+ if(r.label==="SHELF"){ctx.globalAlpha=.18;for(let i=0;i<4;i++){const yy=r.y+(0.18+i*0.18)*r.h;ctx.fillStyle="#00d9ff";ctx.fillRect(r.x+10*dpr,yy,r.w-20*dpr,2*dpr)}ctx.globalAlpha=1}
+ if(r.label==="FRIDGE"){ctx.globalAlpha=.14;ctx.fillStyle="#7c3cff";ctx.fillRect(r.x+r.w-20*dpr,r.y+16*dpr,4*dpr,r.h-32*dpr);
+  for(let i=0;i<3;i++){const yy=r.y+(0.24+i*0.22)*r.h;ctx.fillRect(r.x+10*dpr,yy,r.w-30*dpr,2*dpr)}ctx.globalAlpha=1}
+ ctx.restore();
+}
+function drawTile(t){
+ const ing=t.ing,isMagic=ing.kind==="magic";
+ ctx.save();
+ ctx.fillStyle=isMagic?"rgba(255,255,255,.10)":"rgba(255,255,255,.06)";
+ ctx.strokeStyle=isMagic?"rgba(255,255,255,.20)":"rgba(255,255,255,.12)";
+ roundRect(t.x,t.y,t.w,t.h,14*dpr);ctx.fill();ctx.stroke();
+ ctx.fillStyle=ing.color;roundRect(t.x+8*dpr,t.y+10*dpr,30*dpr,30*dpr,10*dpr);ctx.fill();
+ drawText(ing.name,t.x+48*dpr,t.y+32*dpr,12,"rgba(234,240,255,.95)",850);
+ if(isMagic)drawText("MAGIC",t.x+t.w-64*dpr,t.y+32*dpr,10,"rgba(255,225,120,.95)",950);
+ ctx.restore();
+}
+function drawDishPreview(x,y,title,dish){
+ ctx.save();drawText(title,x,y,11,"rgba(159,176,217,.95)",700);
+ if(!dish||!dish.ingredients.length){drawText("(empty)",x,y+18*dpr,12,"rgba(234,240,255,.65)",700);ctx.restore();return}
+ const names=dish.ingredients.map(i=>i.name).slice(0,4);
+ drawText(names.join(", ")+(dish.ingredients.length>4?"…":""),x,y+18*dpr,12,"rgba(234,240,255,.95)",850);
+ const stats=`cook:${dish.cookLevel.toFixed(2)}  moist:${dish.moisture.toFixed(2)}  brown:${dish.browning.toFixed(2)}  burn:${dish.burn.toFixed(2)}`;
+ drawText(stats,x,y+36*dpr,11,"rgba(159,176,217,.95)",650);ctx.restore();
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ ctx.save();ctx.globalAlpha=.08;
+ for(let y=0;y<H;y+=10*dpr){ctx.fillStyle=((y/10)%2===0)?"#00d9ff":"#7c3cff";ctx.fillRect(0,y,W,1*dpr)}
+ ctx.restore();
+ const z=zoneRects();
+ drawZone(z.shelf);drawZone(z.fridge);drawZone(z.bowl);drawZone(z.skillet);drawZone(z.plate);
+ for(const t of world.tiles)drawTile(t);
+ const shelfCount=world.tiles.filter(t=>t.origin==="shelf").length;
+ const fridgeCount=world.tiles.filter(t=>t.origin==="fridge").length;
+ drawText(`Items: ${shelfCount}`,z.shelf.x+z.shelf.w-90*dpr,z.shelf.y+28*dpr,11,"rgba(234,240,255,.75)",850);
+ drawText(`Items: ${fridgeCount}`,z.fridge.x+z.fridge.w-90*dpr,z.fridge.y+28*dpr,11,"rgba(234,240,255,.75)",850);
+ drawDishPreview(z.bowl.x+12*dpr,z.bowl.y+58*dpr,"Bowl Contents",state.bowlDish);
+ if(state.skilletDish){
+  const s=state.skillet,status=s.active?`COOKING… ${s.remaining.toFixed(1)}s @ ${s.temp.toFixed(0)}°`:`Skillet Dish (ready)`;
+  drawDishPreview(z.skillet.x+12*dpr,z.skillet.y+58*dpr,status,state.skilletDish);
+ } else drawText("Tap skillet to cook bowl contents",z.skillet.x+12*dpr,z.skillet.y+58*dpr,12,"rgba(234,240,255,.75)",700);
+ if(state.plated)drawDishPreview(z.plate.x+12*dpr,z.plate.y+58*dpr,"Plated Dish",state.plated);
+ ctx.save();ctx.globalAlpha=.95;ctx.fillStyle="rgba(255,255,255,.08)";ctx.strokeStyle="rgba(255,255,255,.12)";
+ roundRect(12*dpr,H-58*dpr,260*dpr,46*dpr,14*dpr);ctx.fill();ctx.stroke();
+ drawText("Mama + Vinny 👩‍🍳✨",28*dpr,H-30*dpr,14,"rgba(234,240,255,.95)",950);ctx.restore();
+}
+
+function hexToRgb(hex){const h=hex.replace("#","");const n=parseInt(h,16);return{r:(n>>16)&255,g:(n>>8)&255,b:n&255}}
+function colorFamily(hex){
+ const c=hexToRgb(hex),r=c.r/255,g=c.g/255,b=c.b/255;
+ if(r>0.75&&g<0.4&&b<0.4)return"red";
+ if(g>0.75&&r<0.4&&b<0.4)return"green";
+ if(b>0.75&&r<0.4&&g<0.4)return"blue";
+ if(r>0.7&&g>0.7&&b<0.4)return"yellow";
+ if(r>0.6&&b>0.6)return"purple";
+ if(r>0.8&&g>0.8&&b>0.8)return"white";
+ if(r<0.25&&g<0.25&&b<0.25)return"black";
+ return"mixed";
+}
+updateSeasonHud();
+</script>
+</body>
+</html>
